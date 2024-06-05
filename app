@@ -254,6 +254,84 @@ def chatbot_response(user_input):
 # Streamlit interface
 st.title('Interactive Assistant App')
 
+# Initialize session state for chat history if it doesn't exist
+if 'chat_history' not in st.session_state:
+    st.session_state['chat_history'] = []
+
+# Input fields
+input_text = st.text_input("Input Prompt: ", key="input_text")
+use_webcam = st.checkbox("Use Webcam")
+
+if use_webcam:
+    webcam_image = st.camera_input("Take a picture")
+    if webcam_image is not None:
+        image = Image.open(webcam_image)
+else:
+    uploaded_file = st.file_uploader("Choose an image...", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        image = Image.open(uploaded_file)
+    else:
+        image = None
+
+# Language selection
+language = st.selectbox("Select Language", ["English", "Spanish", "French", "Hindi", "Telugu", "Chinese (Simplified)", "Arabic", "Bengali", "Russian", "Portuguese", "Japanese"])
+
+# Voice input section
+recognizer = sr.Recognizer()
+voice_input = None
+if st.button("Speak"):
+    with sr.Microphone() as source:
+        st.write("Listening...")
+        audio = recognizer.listen(source)
+        try:
+            voice_input = recognizer.recognize_google(audio)
+            st.write(f"Recognized: {voice_input}")
+        except sr.UnknownValueError:
+            st.error("Google Speech Recognition could not understand the audio")
+        except sr.RequestError as e:
+            st.error(f"Could not request results from Google Speech Recognition service; {e}")
+
+# Submit button
+submit = st.button("Ask the question")
+generate_voice_output = st.checkbox("Generate Voice Output")
+
+# Handle submission
+if submit or voice_input:
+    response_text = ""
+    query = voice_input if voice_input else input_text
+
+    if image:
+        # Handle text + image query
+        response = get_vision_response(query, image, target_language=language_code(language))
+        if response:
+            st.subheader("The Response is")
+            if isinstance(response, str):
+                st.write(response)
+                response_text = response
+                st.session_state['chat_history'].append(("You", query))
+                st.session_state['chat_history'].append(("Bot", response))
+            else:
+                st.error("Response did not contain valid text data.")
+                if hasattr(response, 'candidate') and hasattr(response.candidate, 'safety_ratings'):
+                    st.write(f"Safety ratings: {response.candidate.safety_ratings}")
+                else:
+                    st.write("Response was blocked or invalid.")
+    else:
+        # Handle text-only query
+        response = get_text_response(query, target_language=language_code(language))
+        if response:
+            st.subheader("The Response is")
+            st.write(response)
+            response_text = response
+            st.session_state['chat_history'].append(("You", query))
+            st.session_state['chat_history'].append(("Bot", response))
+    
+    if generate_voice_output and response_text:
+        audio_base64 = generate_voice(response_text, language_code(language))
+        audio_html = f'<audio controls autoplay><source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3"></audio>'
+        st.markdown(audio_html, unsafe_allow_html=True)
+
+
 menu = ['Home', 'Capture Image', 'Ask Question', 'Open Application', 'Set Reminder', 'Chat']
 choice = st.sidebar.selectbox('Select Action', menu)
 
