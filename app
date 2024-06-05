@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 import streamlit as st
 import random
 import time
@@ -314,4 +315,5 @@ elif choice == 'Chat':
             response = get_text_response(user_input)
             st.write(response)
             speak(response)
+
 
