@@ -152,6 +152,10 @@ def parse_reminder(text):
     time_unit = None
     reminder_message = None
 
+def speak_in_thread(message):
+    t = threading.Thread(target=speak, args=(message,))
+    t.start()
+
     for ent in doc.ents:
         if ent.label_ == "TIME":
             time_value, time_unit = extract_time_value(ent.text)
@@ -377,7 +381,7 @@ elif choice == 'Set Reminder':
             while datetime.now() < reminder_time:
                 time.sleep(1)
             st.write(f"Reminder: {reminder_message}")
-            speak(f"Reminder: {reminder_message}")
+            speak_in_thread(f"Reminder: {reminder_message}")
         else:
             st.write("Sorry, I could not understand the time for the reminder.")
 
