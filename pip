@@ -16,7 +16,7 @@ import asyncio
 import threading
 
 # Initialize components
-genai.configure(api_key="AIzaSyCAP3JcRNz5XaARv6R4NN0WawFfeljx6xI")
+genai.configure(api_key="AIzaSyCK99EISZnvXHHoUYVqAmWwUWpfPOhIts0")
 processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
 model = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
 engine = pyttsx3.init()
