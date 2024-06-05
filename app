@@ -16,6 +16,7 @@ import pyttsx3
 import subprocess
 from datetime import datetime, timedelta
 import spacy
+import threading
 
 # Load environment variables from .env file
 load_dotenv()
