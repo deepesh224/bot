@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import streamlit as st
 import random
 import time
@@ -6,14 +8,29 @@ from transformers import ViltProcessor, ViltForQuestionAnswering
 from PIL import Image
 import torch
 import google.generativeai as genai
+from gtts import gTTS
+import base64
 import speech_recognition as sr
+from googletrans import Translator
 import pyttsx3
 import subprocess
 from datetime import datetime, timedelta
 import spacy
 
-# Configure the API key for Google Generative AI
-genai.configure(api_key="AIzaSyBul1X0XZl5ymAPSDtcaqtdNdJFOg17fmI")
+# Load environment variables from .env file
+load_dotenv()
+
+# Configure Google Generative AI
+api_key = os.getenv("GOOGLE_API_KEY")
+if not api_key:
+    st.error("Please set the GOOGLE_API_KEY environment variable.")
+else:
+    genai.configure(api_key=api_key)
+
+# Initialize the Gemini Pro models
+text_model = genai.GenerativeModel('gemini-pro')
+vision_model = genai.GenerativeModel('gemini-pro-vision')
+chat_session = text_model.start_chat(history=[])
 
 # Initialize the VILT model and processor for image question answering
 processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
@@ -22,33 +39,89 @@ model = ViltForQuestionAnswering.from_pretrained("dandelin/vilt-b32-finetuned-vq
 # Initialize text-to-speech engine
 engine = pyttsx3.init()
 
-# Configure Google Generative AI (Gemini) model
-generation_config = {
-    "temperature": 0.7,
-    "top_p": 0.9,
-    "top_k": 50,
-    "max_output_tokens": 8192,
-    "response_mime_type": "text/plain",
-}
+# Initialize Translator
+translator = Translator()
 
-safety_settings = [
-    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-]
-
-chat_model = genai.GenerativeModel(
-    model_name="gemini-1.5-flash",
-    safety_settings=safety_settings,
-    generation_config=generation_config,
-)
-
-chat_session = chat_model.start_chat(history=[])
-
-# Initialize the recognizer, TTS engine, and spaCy model for reminders
+# Initialize the recognizer and spaCy model for reminders
 recognizer = sr.Recognizer()
 nlp = spacy.load('en_core_web_sm')
+
+# Function to translate text
+def translate_text(text, src_language, target_language='en'):
+    try:
+        translation = translator.translate(text, src=src_language, dest=target_language)
+        return translation.text
+    except Exception as e:
+        st.error(f"Translation error: {e}")
+        return text
+
+# Function to detect the language of the text
+def detect_language(text):
+    try:
+        detected_lang = translator.detect(text).lang
+        return detected_lang
+    except Exception as e:
+        st.error(f"Language detection error: {e}")
+        return 'en'
+
+# Function to get response for text queries
+def get_text_response(question, target_language='en'):
+    try:
+        detected_lang = detect_language(question)
+        translated_question = translate_text(question, src_language=detected_lang, target_language='en')
+        response = chat_session.send_message(translated_question, stream=True)
+        response_text = ''.join(chunk.text for chunk in response if chunk.text)
+        translated_response = translate_text(response_text, src_language='en', target_language=target_language)
+        return translated_response
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return None
+
+# Function to get response for text + image queries
+def get_vision_response(input_text, image, target_language='en'):
+    try:
+        detected_lang = detect_language(input_text)
+        translated_text = translate_text(input_text, src_language=detected_lang, target_language='en')
+        if translated_text:
+            response = vision_model.generate_content([translated_text, image])
+        else:
+            response = vision_model.generate_content(image)
+        if response.text.strip():  # Check if response text is not empty
+            translated_response = translate_text(response.text, src_language='en', target_language=target_language)
+            return translated_response
+        else:
+            st.warning("Response did not contain valid text data.")
+            return None
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        return None
+
+# Function to generate voice output
+def generate_voice(text, language='en'):
+    tts = gTTS(text, lang=language_code(language))
+    tts.save("response.mp3")
+    with open("response.mp3", "rb") as audio_file:
+        audio_bytes = audio_file.read()
+        audio_base64 = base64.b64encode(audio_bytes).decode("utf-8")
+    return audio_base64
+
+# Function to get language code from language name
+def language_code(language_name):
+    language_codes = {
+        "English": "en",
+        "Spanish": "es",
+        "French": "fr",
+        "Hindi": "hi",
+        "Telugu": "te",
+        "Chinese (Simplified)": "zh-CN",
+        "Arabic": "ar",
+        "Bengali": "bn",
+        "Russian": "ru",
+        "Portuguese": "pt",
+        "Japanese": "ja",
+        # Add more languages as needed
+    }
+    return language_codes.get(language_name, "en")
 
 # Function to recognize speech and convert it to text
 def recognize_speech():
@@ -166,15 +239,15 @@ def open_application(app_name):
 def chatbot_response(user_input):
     user_input = user_input.lower()
     responses = {
-        "i love you": "I love you too guru ji!",
-        "i hate you": "Why do you hate me guru ji?",
-        "i'm happy": "That's great to hear guru ji!",
-        "i'm sad": "I'm sorry to hear that guru ji. How can I help?",
-        "i'm angry": "Take a deep breath guru ji. What's bothering you?",
-        "thank you": "You're welcome guru ji!",
-        "hello": "Hi guru ji! How can I help you today?",
-        "goodbye": "Goodbye guru ji! Have a great day!",
-        "how are you": "I'm just a bunch of code guru ji, but thanks for asking!"
+        "i love you": "I love you too!",
+        "i hate you": "Why do you hate me?",
+        "i'm happy": "That's great to hear!",
+        "i'm sad": "I'm sorry to hear that. How can I help?",
+        "i'm angry": "Take a deep breath. What's bothering you?",
+        "thank you": "You're welcome!",
+        "hello": "Hi! How can I help you today?",
+        "goodbye": "Goodbye! Have a great day!",
+        "how are you": "I'm just a bunch of code, but thanks for asking!"
     }
     return responses.get(user_input, None)
 
@@ -206,9 +279,9 @@ elif choice == 'Ask Question':
             st.write(response)
             speak(response)
         else:
-            response = chat_session.send_message(question)
-            st.write(response.text)
-            speak(response.text)
+            response = get_text_response(question)
+            st.write(response)
+            speak(response)
 
 elif choice == 'Open Application':
     st.write("Open an application.")
@@ -226,7 +299,7 @@ elif choice == 'Set Reminder':
             while datetime.now() < reminder_time:
                 time.sleep(1)
             st.write(f"Reminder: {reminder_message}")
-            speak(f"guru ji Reminder: {reminder_message}")
+            speak(f"Reminder: {reminder_message}")
         else:
             st.write("Sorry, I could not understand the time for the reminder.")
 
@@ -239,44 +312,7 @@ elif choice == 'Chat':
             st.write(response)
             speak(response)
         else:
-            response = chat_session.send_message(user_input)
-            st.write(response.text)
-            speak(response.text)
-# Streamlit interface
-st.title('Interactive Assistant App')
-
-menu = ['Home', 'Capture Image', 'Ask Question', 'Open Application', 'Set Reminder', 'Chat']
-choice = st.sidebar.selectbox('Select Action', menu)
-
-if choice == 'Home':
-    st.write("Welcome to the Interactive Assistant App. Choose an action from the sidebar.")
-
-elif choice == 'Chat':
-    st.write("Chat with me.")
-    user_input = st.text_input('You:')
-    text_button = st.button('Text')
-    speech_button = st.button('Speech')
-
-    if text_button:
-        response = chatbot_response(user_input)
-        if response:
+            response = get_text_response(user_input)
             st.write(response)
             speak(response)
-        else:
-            response = chat_session.send_message(user_input)
-            st.write(response.text)
-            speak(response.text)
 
-    elif speech_button:
-        speech_text = recognize_speech()
-        if speech_text:
-            response = chatbot_response(speech_text)
-            if response:
-                st.write(response)
-                speak(response)
-            else:
-                response = chat_session.send_message(speech_text)
-                st.write(response.text)
-                speak(response.text)
-        else:
-            st.write("Sorry, I did not understand that.")
