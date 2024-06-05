@@ -242,3 +242,41 @@ elif choice == 'Chat':
             response = chat_session.send_message(user_input)
             st.write(response.text)
             speak(response.text)
+# Streamlit interface
+st.title('Interactive Assistant App')
+
+menu = ['Home', 'Capture Image', 'Ask Question', 'Open Application', 'Set Reminder', 'Chat']
+choice = st.sidebar.selectbox('Select Action', menu)
+
+if choice == 'Home':
+    st.write("Welcome to the Interactive Assistant App. Choose an action from the sidebar.")
+
+elif choice == 'Chat':
+    st.write("Chat with me.")
+    user_input = st.text_input('You:')
+    text_button = st.button('Text')
+    speech_button = st.button('Speech')
+
+    if text_button:
+        response = chatbot_response(user_input)
+        if response:
+            st.write(response)
+            speak(response)
+        else:
+            response = chat_session.send_message(user_input)
+            st.write(response.text)
+            speak(response.text)
+
+    elif speech_button:
+        speech_text = recognize_speech()
+        if speech_text:
+            response = chatbot_response(speech_text)
+            if response:
+                st.write(response)
+                speak(response)
+            else:
+                response = chat_session.send_message(speech_text)
+                st.write(response.text)
+                speak(response.text)
+        else:
+            st.write("Sorry, I did not understand that.")
