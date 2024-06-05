@@ -352,6 +352,7 @@ elif choice == 'Capture Image':
         if st.button('Get Answer'):
             answer = answer_question(image_path, question)
             st.write(f"The answer is: {answer}")
+            speak(f"The answer is: {answer}")
 
 elif choice == 'Ask Question':
     st.write("You can ask me anything.")
