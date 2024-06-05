@@ -394,10 +394,10 @@ elif choice == 'Chat':
         response = chatbot_response(user_input)
         if response:
             st.write(response)
-            speak(response)
+            speak_in_thread(response)
         else:
             response = get_text_response(user_input)
             st.write(response)
-            speak(response)
+            speak_in_thread(response)
 
 
