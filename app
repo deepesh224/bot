@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import spacy
 
 # Configure the API key for Google Generative AI
-genai.configure(api_key="AIzaSyCLvXV0su98uxXa3NbOT8S0HaqKQf2macs")
+genai.configure(api_key="AIzaSyBul1X0XZl5ymAPSDtcaqtdNdJFOg17fmI")
 
 # Initialize the VILT model and processor for image question answering
 processor = ViltProcessor.from_pretrained("dandelin/vilt-b32-finetuned-vqa")
