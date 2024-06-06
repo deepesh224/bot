@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        .eye {
+            width: 50px;
+            height: 50px;
+            background: black;
+            border-radius: 50%;
+            position: relative;
+            margin: 50px auto;
+        }
+        .pupil {
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            transition: transform 0.1s;
+        }
+    </style>
+</head>
+<body>
+    <div class="eye">
+        <div class="pupil" id="left-pupil"></div>
+    </div>
+    <div class="eye">
+        <div class="pupil" id="right-pupil"></div>
+    </div>
+
+    <script>
+        document.addEventListener('mousemove', function(event) {
+            let eyes = document.querySelectorAll('.pupil');
+            eyes.forEach(function(eye) {
+                let rect = eye.getBoundingClientRect();
+                let x = rect.left + rect.width / 2;
+                let y = rect.top + rect.height / 2;
+                let radian = Math.atan2(event.clientX - x, event.clientY - y);
+                let angle = radian * (180 / Math.PI);
+                eye.style.transform = `rotate(${angle}deg)`;
+            });
+        });
+    </script>
+</body>
+</html>
