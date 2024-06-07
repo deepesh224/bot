@@ -17,7 +17,7 @@ import subprocess
 from datetime import datetime, timedelta
 import spacy
 import threading
-
+import streamlit.components.v1 as components
 # Load environment variables from .env file
 load_dotenv()
 
@@ -46,6 +46,7 @@ translator = Translator()
 # Initialize the recognizer and spaCy model for reminders
 recognizer = sr.Recognizer()
 nlp = spacy.load('en_core_web_sm')
+
 
 # Function to translate text
 def translate_text(text, src_language, target_language='en'):
@@ -146,16 +147,16 @@ def speak(text):
     engine.say(text)
     engine.runAndWait()
 
+def speak_in_thread(message):
+    t = threading.Thread(target=speak, args=(message,))
+    t.start()
+
 # Function to parse the reminder text and extract time using spaCy
 def parse_reminder(text):
     doc = nlp(text)
     time_value = None
     time_unit = None
     reminder_message = None
-
-def speak_in_thread(message):
-    t = threading.Thread(target=speak, args=(message,))
-    t.start()
 
     for ent in doc.ents:
         if ent.label_ == "TIME":
@@ -256,8 +257,169 @@ def chatbot_response(user_input):
     }
     return responses.get(user_input, None)
 
+menu = ['Home', 'Capture Image', 'Ask Question', 'Open Application', 'Set Reminder', 'Chat']
+choice = st.sidebar.selectbox('Select Action', menu)
+
+if choice == 'Home':
+    st.write("Welcome to the Interactive Assistant App. Choose an action from the sidebar.")
+
+elif choice == 'Capture Image':
+    st.write("Capturing an image from the webcam.")
+    image_path = capture_image()
+    if image_path:
+        st.image(image_path, caption='Captured Image')
+        question = st.text_input('Ask a question about the image:')
+        if st.button('Get Answer'):
+            answer = answer_question(image_path, question)
+            st.write(f"The answer is: {answer}")
+            speak_in_thread(f"The answer is: {answer}")
+
+elif choice == 'Ask Question':
+    st.write("You can ask me anything.")
+    question = st.text_input('Ask a question:')
+    if st.button('Get Response'):
+        response = chatbot_response(question)
+        if response:
+            st.write(response)
+            speak(response)
+        else:
+            response = get_text_response(question)
+            st.write(response)
+            speak_in_thread(response)
+
+elif choice == 'Open Application':
+    st.write("Open an application.")
+    app_name = st.text_input('Enter the name of the application:')
+    if st.button('Open'):
+        open_application(app_name)
+
+elif choice == 'Set Reminder':
+    st.write("Set a reminder.")
+    reminder_text = st.text_input('Enter the reminder text:')
+    if st.button('Set Reminder'):
+        reminder_time, reminder_message = parse_reminder(reminder_text)
+        if reminder_time:
+            st.write(f"Reminder set for {reminder_message} at {reminder_time.strftime('%H:%M:%S')}")
+            while datetime.now() < reminder_time:
+                time.sleep(1)
+            st.write(f"Reminder: {reminder_message}")
+            speak_in_thread(f"Reminder: {reminder_message}")
+        else:
+            st.write("Sorry, I could not understand the time for the reminder.")
+
+elif choice == 'Chat':
+    st.write("Chat with me.")
+    user_input = st.text_input('You:')
+    if st.button('Send'):
+        response = chatbot_response(user_input)
+        if response:
+            st.write(response)
+            speak_in_thread(response)
+        else:
+            response = get_text_response(user_input)
+            st.write(response)
+            speak_in_thread(response)
+
 # Streamlit interface
-st.title('Interactive Assistant App')
+st.title('Interactive Assistant')
+
+# Add the eye animation here
+eye_animation_html = """
+   <div style="text-align: center;">
+        <div id="eyes" style="width: 500px; height: 200px; margin: 0 auto;">
+            <div style="position: relative; width: 100%; height: 100%;">
+                <div id="left-eye" style="position: absolute; left: 20%; top: 25%; width: 25%; height: 50%; background: green; border-radius: 15px; overflow: hidden;">
+                    <div id="left-pupil" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40%; height: 40%; background: white; border-radius: 50%; transition: top 0.2s, left 0.2s;"></div>
+                </div>
+                <div id="right-eye" style="position: absolute; right: 20%; top: 25%; width: 25%; height: 50%; background: green; border-radius: 15px; overflow: hidden;">
+                    <div id="right-pupil" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40%; height: 40%; background: white; border-radius: 50%; transition: top 0.2s, left 0.2s;"></div>
+                </div>
+            </div>
+        </div>
+        <div id="lips" style="width: 200px; height: 20px; margin: 20px auto; background-color: white; border-radius: 50%; transition: width 0.5s;"></div>
+    </div>
+<script>
+    function movePupil(event) {
+    var eyes = document.getElementById('eyes');
+    var rect = eyes.getBoundingClientRect();
+    var mouseX = event.clientX - rect.left;
+    var mouseY = event.clientY - rect.top;
+    var eyeWidth = rect.width / 2;
+    var eyeHeight = rect.height / 2;
+    var pupilWidth = 40; // Width of the pupil
+    var maxPupilOffsetX = (eyeWidth - pupilWidth) / 2; // Maximum horizontal offset of the pupil
+    var maxPupilOffsetY = (eyeHeight - pupilWidth) / 2; // Maximum vertical offset of the pupil
+    var deltaX = mouseX - eyeWidth / 2;
+    var deltaY = mouseY - eyeHeight / 2;
+    var radius = Math.min(maxPupilOffsetX, maxPupilOffsetY);
+    var distanceFromCenter = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+    var pupilOffsetX = (deltaX / distanceFromCenter) * radius + eyeWidth / 2;
+    var pupilOffsetY = (deltaY / distanceFromCenter) * radius + eyeHeight / 2;
+    var leftPupil = document.getElementById('left-pupil');
+    var rightPupil = document.getElementById('right-pupil');
+    leftPupil.style.left = (pupilOffsetX - pupilWidth / 2) + 'px';
+    leftPupil.style.top = (pupilOffsetY - pupilWidth / 2) + 'px';
+    rightPupil.style.left = (pupilOffsetX - pupilWidth / 2) + 'px';
+    rightPupil.style.top = (pupilOffsetY - pupilWidth / 2) + 'px';
+  }
+   function moveLips() {
+        var lips = document.getElementById('lips');
+        var audioElement = document.getElementById('responseAudio');
+        var audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioContext.createMediaElementSource(audioElement);
+        var analyzer = audioContext.createAnalyser();
+        source.connect(analyzer);
+        analyzer.connect(audioContext.destination);
+        analyzer.fftSize = 256;
+        var bufferLength = analyzer.frequencyBinCount;
+        var dataArray = new Uint8Array(bufferLength);
+
+        function animateLips() {
+            analyzer.getByteFrequencyData(dataArray);
+            var sum = dataArray.reduce((a, b) => a + b, 0);
+            var average = sum / bufferLength;
+            var scale = average / 128; // Adjust the scale factor as needed
+            lips.style.transform = 'scaleY(' + (1 + scale) + ')';
+            requestAnimationFrame(animateLips);
+        }
+
+        animateLips();
+    }
+
+    document.addEventListener('mousemove', movePupil);
+
+    // Call the moveLips function whenever speech output occurs
+    function speakOutput() {
+        // Call the function to generate speech output
+        // Once the speech output is complete, call moveLips()
+        moveLips();
+    }
+    // Insert the blinkEyes function here
+    function blinkEyes() {
+        var leftEye = document.getElementById('left-eye');
+        var rightEye = document.getElementById('right-eye');
+        var interval = 4000; // Interval for blinking in milliseconds (4 seconds)
+        setInterval(function() {
+            leftEye.style.transition = "height 0.2s";
+            rightEye.style.transition = "height 0.2s";
+            // Close eyes
+            leftEye.style.height = "20%";
+            rightEye.style.height = "20%";
+            setTimeout(function() {
+                // Open eyes after a short delay
+                leftEye.style.height = "50%";
+                rightEye.style.height = "50%";
+            }, 200); // Wait for 0.2 seconds before opening eyes
+        }, interval); // Blink every 4 seconds
+    }
+
+    // Call the blinkEyes function to start blinking
+    blinkEyes();
+    speakOutput();
+</script>
+    """
+components.html(eye_animation_html, height=300)
+
 
 # Initialize session state for chat history if it doesn't exist
 if 'chat_history' not in st.session_state:
@@ -332,6 +494,10 @@ if submit or voice_input:
             st.session_state['chat_history'].append(("Bot", response))
     
     if generate_voice_output and response_text:
+        audio_base64 = generate_voice(response_text, language_code(language))
+        audio_html = f'<audio controls autoplay><source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3"></audio>'
+        st.markdown(audio_html, unsafe_allow_html=True)
+
         audio_base64 = generate_voice(response_text, language_code(language))
         audio_html = f'<audio controls autoplay><source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3"></audio>'
         st.markdown(audio_html, unsafe_allow_html=True)
